@@ -1,12 +1,23 @@
 import { test, expect, mock, beforeEach } from "bun:test";
-import { rmSync, existsSync } from "fs";
+import { rmSync, existsSync, mkdtempSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
+const DIR = join(mkdtempSync(join(tmpdir(), "caff-v2-")), "state");
+process.env.OPENCODE_CAFFEINATE_DIR = DIR;
+const killOwn = () => {
+  try {
+    const pid = Number(require("fs").readFileSync(join(DIR, "caffeinate.pid"), "utf-8").trim());
+    if (pid > 1) process.kill(pid, "SIGTERM");
+  } catch {}
+};
+
 
 mock.module("@opencode/plugin", () => ({ Plugin: { define: (d: any) => d } }));
-const awake = () => existsSync("/tmp/opencode-caffeinate/caffeinate.pid");
+const awake = () => existsSync(join(DIR, "caffeinate.pid"));
 
 beforeEach(() => {
-  rmSync("/tmp/opencode-caffeinate", { recursive: true, force: true });
-  Bun.spawnSync(["pkill", "-x", "caffeinate"]);
+  killOwn();
+  rmSync(DIR, { recursive: true, force: true });
 });
 
 test("v2 entry subscribes to events and tears down", async () => {

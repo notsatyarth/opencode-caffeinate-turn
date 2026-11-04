@@ -3,7 +3,19 @@ import { rmSync, readdirSync, existsSync } from "fs";
 import { CaffeinatePlugin } from "../index";
 
 const client: any = { app: { log: async () => {} } };
-const DIR = "/tmp/opencode-caffeinate";
+import { mkdtempSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
+const ROOT = mkdtempSync(join(tmpdir(), "caff-test-"));
+const DIR = join(ROOT, "state");
+process.env.OPENCODE_CAFFEINATE_DIR = DIR;
+const killOwn = () => {
+  try {
+    const pid = Number(require("fs").readFileSync(join(DIR, "caffeinate.pid"), "utf-8").trim());
+    if (pid > 1) process.kill(pid, "SIGTERM");
+  } catch {}
+};
+
 const sessions = () =>
   existsSync(`${DIR}/sessions`) ? readdirSync(`${DIR}/sessions`).filter((f) => f.endsWith(".session")) : [];
 const awake = () => existsSync(`${DIR}/caffeinate.pid`);
@@ -14,13 +26,13 @@ const status = (h: any, t: string, id = "ses_a") => send(h, "session.status", id
 
 let hooks: any;
 beforeEach(async () => {
+  killOwn();
   rmSync(DIR, { recursive: true, force: true });
-  Bun.spawnSync(["pkill", "-x", "caffeinate"]);
   hooks = await CaffeinatePlugin({ client } as any);
 });
 afterAll(() => {
+  killOwn();
   rmSync(DIR, { recursive: true, force: true });
-  Bun.spawnSync(["pkill", "-x", "caffeinate"]);
 });
 
 describe("plugin events", () => {
