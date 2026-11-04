@@ -2,13 +2,9 @@ import type { Plugin } from "@opencode-ai/plugin";
 import { SessionManager } from "./session-manager";
 import { CaffeinateManager } from "./caffeinate-manager";
 
-export const CaffeinatePlugin: Plugin = async ({
-  project,
-  client,
-  $,
-  directory,
-  worktree,
-}) => {
+type PluginEvent = { type: string; properties?: any; data?: any };
+
+export const CaffeinatePlugin: Plugin = async ({ client }) => {
   const SERVICE_NAME = "opencode-caffeinate";
 
   const logFn = (message: string, level: "info" | "warn" | "debug" | "error" = "info") => {
@@ -21,7 +17,6 @@ export const CaffeinatePlugin: Plugin = async ({
     }).catch(() => {});
   };
 
-  // Check if on macOS
   if (process.platform !== "darwin") {
     logFn("Plugin disabled: only available on macOS", "warn");
     return {};
@@ -30,49 +25,74 @@ export const CaffeinatePlugin: Plugin = async ({
   const sessionManager = new SessionManager();
   const caffeinateManager = new CaffeinateManager();
 
-  // Fire-and-forget log to avoid blocking initialization
   logFn("Plugin initialized", "info");
 
+  const acquire = async (sessionID: string) => {
+    sessionManager.registerSession(process.pid, sessionID);
+
+    if (caffeinateManager.isRunning()) return;
+
+    try {
+      await caffeinateManager.start();
+      logFn(`caffeinate started (PID: ${caffeinateManager.getPid()})`, "info");
+    } catch (error) {
+      logFn(`Failed to start caffeinate: ${error}`, "error");
+    }
+  };
+
+  const release = async (sessionID: string) => {
+    sessionManager.unregisterSession(process.pid, sessionID);
+
+    if (sessionManager.hasActiveSessions()) return;
+
+    if (caffeinateManager.isRunning()) {
+      try {
+        const pid = caffeinateManager.getPid();
+        await caffeinateManager.stop();
+        logFn(`caffeinate stopped (PID: ${pid})`, "info");
+      } catch (error) {
+        logFn(`Failed to stop caffeinate: ${error}`, "error");
+      }
+    }
+  };
+
   return {
-    event: async ({ event }: { event: { type: string } }) => {
+    event: async ({ event }: { event: PluginEvent }) => {
+      const props = event.properties ?? event.data ?? {};
+      const sessionID: string | undefined = props.sessionID ?? props.info?.id;
+      if (!sessionID) return;
+
       switch (event.type) {
-        case "session.created":
-          sessionManager.registerSession(process.pid);
-          
-          if (caffeinateManager.isRunning()) {
-            const pid = caffeinateManager.getPid();
-            logFn(`Session started. caffeinate already running (PID: ${pid})`, "debug");
-            return;
-          }
-          
-          try {
-            await caffeinateManager.start();
-            const pid = caffeinateManager.getPid();
-            logFn(`caffeinate started (PID: ${pid})`, "info");
-          } catch (error) {
-            logFn(`Failed to start caffeinate: ${error}`, "error");
+        // Agent is working: keep the machine awake.
+        case "session.status": {
+          const status = props.status?.type;
+          if (status === "busy" || status === "retry") {
+            await acquire(sessionID);
+          } else if (status === "idle") {
+            await release(sessionID);
           }
           break;
+        }
 
+        // Waiting on the user (question or permission prompt): allow sleep.
+        case "question.asked":
+        case "permission.asked":
+        case "permission.updated":
+          await release(sessionID);
+          break;
+
+        // User answered: agent resumes work.
+        case "question.replied":
+        case "permission.replied":
+          await acquire(sessionID);
+          break;
+
+        // Rejected question/aborted turn ends the work.
+        case "question.rejected":
         case "session.idle":
+        case "session.error":
         case "session.deleted":
-          sessionManager.unregisterSession(process.pid);
-          
-          if (sessionManager.hasActiveSessions()) {
-            const activeCount = sessionManager.getActiveSessions().length;
-            logFn(`Session ended. ${activeCount} active sessions remaining`, "debug");
-            return;
-          }
-          
-          if (caffeinateManager.isRunning()) {
-            try {
-              const pid = caffeinateManager.getPid();
-              await caffeinateManager.stop();
-              logFn(`caffeinate stopped (PID: ${pid})`, "info");
-            } catch (error) {
-              logFn(`Failed to stop caffeinate: ${error}`, "error");
-            }
-          }
+          await release(sessionID);
           break;
       }
     },

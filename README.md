@@ -1,6 +1,6 @@
 # opencode-caffeinate
 
-Prevent macOS from sleeping while OpenCode sessions are active.
+Prevent macOS from sleeping while OpenCode is working a turn.
 
 ## What it does
 
@@ -44,13 +44,12 @@ git clone https://github.com/nguyenphutrong/opencode-caffeinate.git .opencode/pl
 
 ## How it works
 
-1. When a session is created (`session.created` event), the plugin registers the session in `/tmp/opencode-caffeinate/sessions/`
-2. A single `caffeinate` process is spawned if not already running (tracked via PID file at `/tmp/opencode-caffeinate/caffeinate.pid`)
-3. Multiple parallel OpenCode instances are supported - sessions are tracked across processes
-4. When a session ends (`session.idle` or `session.deleted` events), the session is unregistered
-5. When all sessions across all instances end, caffeinate is stopped automatically
+caffeinate runs only while the agent is actively working a turn:
 
-**Cross-process synchronization:** The plugin uses file-based session tracking to correctly handle multiple OpenCode instances running in parallel. Each session creates a PID file, and stale sessions (crashed processes) are automatically detected and ignored.
+- **Awake**: `session.status` = `busy`/`retry`, or `question.replied` / `permission.replied` (agent resumes).
+- **Allowed to sleep**: `session.status` = `idle`, `session.idle`, `question.asked`, `permission.asked`/`permission.updated` (waiting on you), `question.rejected`, `session.error`, `session.deleted`.
+
+Each working session is tracked as a file in `/tmp/opencode-caffeinate/sessions/` (`<pid>_<sessionID>.session`). A single `caffeinate` process (PID in `/tmp/opencode-caffeinate/caffeinate.pid`) is shared across parallel OpenCode instances and stopped when no session is working. Stale sessions from crashed processes are ignored.
 
 ## Development
 

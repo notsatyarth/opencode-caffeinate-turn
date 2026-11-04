@@ -15,13 +15,17 @@ export class SessionManager {
     }
   }
 
-  registerSession(pid: number): void {
-    const sessionFile = join(this.sessionsDir, `${pid}.session`);
-    writeFileSync(sessionFile, "", { flag: "w" });
+  private fileFor(pid: number, sessionID?: string): string {
+    const name = sessionID ? `${pid}_${sessionID}.session` : `${pid}.session`;
+    return join(this.sessionsDir, name);
   }
 
-  unregisterSession(pid: number): void {
-    const sessionFile = join(this.sessionsDir, `${pid}.session`);
+  registerSession(pid: number, sessionID?: string): void {
+    writeFileSync(this.fileFor(pid, sessionID), "", { flag: "w" });
+  }
+
+  unregisterSession(pid: number, sessionID?: string): void {
+    const sessionFile = this.fileFor(pid, sessionID);
     if (existsSync(sessionFile)) {
       unlinkSync(sessionFile);
     }
@@ -37,7 +41,7 @@ export class SessionManager {
 
     for (const file of files) {
       if (file.endsWith(".session")) {
-        const pid = parseInt(file.replace(".session", ""), 10);
+        const pid = parseInt(file.replace(".session", "").split("_")[0] ?? "", 10);
         if (!isNaN(pid) && this.isProcessAlive(pid)) {
           activeSessions.push(pid);
         }
