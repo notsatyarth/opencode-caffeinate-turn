@@ -36,6 +36,10 @@ git clone https://github.com/nguyenphutrong/opencode-caffeinate.git ~/.config/op
 git clone https://github.com/nguyenphutrong/opencode-caffeinate.git .opencode/plugins/opencode-caffeinate
 ```
 
+## OpenCode v2
+
+OpenCode v2 requires a default export from `Plugin.define`. Use `.opencode/plugin/v2.ts` as the entry (for example, `~/.config/opencode/plugins/caffeinate.ts` containing `export { default } from "/path/to/opencode-caffeinate/.opencode/plugin/v2.ts"`). `index.ts` remains the v1 entry. Both share `core.ts`.
+
 ## Requirements
 
 - **macOS only** - The `caffeinate` command is macOS-specific
@@ -46,8 +50,8 @@ git clone https://github.com/nguyenphutrong/opencode-caffeinate.git .opencode/pl
 
 caffeinate runs only while the agent is actively working a turn:
 
-- **Awake**: `session.status` = `busy`/`retry`, or `question.replied` / `permission.replied` (and their `.v2.` variants) (agent resumes).
-- **Allowed to sleep**: `session.status` = `idle`, `session.idle`, `question.asked`, `permission.asked`/`permission.updated` (waiting on you), `question.rejected`, `session.error`, `session.deleted`.
+- **Awake**: `session.status` = `busy`/`retry`, or `question.replied` / `permission.replied` (and their `.v2.` variants), `form.replied`, `session.execution.started` (agent resumes).
+- **Allowed to sleep**: `session.status` = `idle`, `session.idle`, `question.asked`, `permission.asked`/`permission.updated` (waiting on you), `form.created`/`form.cancelled`, `session.execution.succeeded`/`failed`/`interrupted`, `question.rejected`, `session.error`, `session.deleted`.
 
 Each working session is tracked as a file in `/tmp/opencode-caffeinate/sessions/` (`<pid>_<sessionID>.session`). A single `caffeinate` process (PID in `/tmp/opencode-caffeinate/caffeinate.pid`) is shared across parallel OpenCode instances and stopped when no session is working. Stale sessions from crashed processes are ignored.
 
