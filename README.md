@@ -46,7 +46,7 @@ git clone https://github.com/nguyenphutrong/opencode-caffeinate.git .opencode/pl
 
 caffeinate runs only while the agent is actively working a turn:
 
-- **Awake**: `session.status` = `busy`/`retry`, or `question.replied` / `permission.replied` (agent resumes).
+- **Awake**: `session.status` = `busy`/`retry`, or `question.replied` / `permission.replied` (and their `.v2.` variants) (agent resumes).
 - **Allowed to sleep**: `session.status` = `idle`, `session.idle`, `question.asked`, `permission.asked`/`permission.updated` (waiting on you), `question.rejected`, `session.error`, `session.deleted`.
 
 Each working session is tracked as a file in `/tmp/opencode-caffeinate/sessions/` (`<pid>_<sessionID>.session`). A single `caffeinate` process (PID in `/tmp/opencode-caffeinate/caffeinate.pid`) is shared across parallel OpenCode instances and stopped when no session is working. Stale sessions from crashed processes are ignored.

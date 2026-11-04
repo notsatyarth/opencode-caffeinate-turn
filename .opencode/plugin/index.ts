@@ -76,19 +76,24 @@ export const CaffeinatePlugin: Plugin = async ({ client }) => {
 
         // Waiting on the user (question or permission prompt): allow sleep.
         case "question.asked":
+        case "question.v2.asked":
         case "permission.asked":
+        case "permission.v2.asked":
         case "permission.updated":
           await release(sessionID);
           break;
 
         // User answered: agent resumes work.
         case "question.replied":
+        case "question.v2.replied":
         case "permission.replied":
+        case "permission.v2.replied":
           await acquire(sessionID);
           break;
 
         // Rejected question/aborted turn ends the work.
         case "question.rejected":
+        case "question.v2.rejected":
         case "session.idle":
         case "session.error":
         case "session.deleted":
